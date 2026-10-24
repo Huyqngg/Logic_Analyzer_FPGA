@@ -1,83 +1,83 @@
-# FPGA Logic Analyzer
+# Máy phân tích logic trên FPGA
 
-**16 channels · up to 100 MSa/s · UART / I2C / SPI decoding · Python desktop GUI**
+**16 kênh · Tốc độ lấy mẫu tới 100 MSa/s · Giải mã UART / I2C / SPI · Giao diện Python**
 
-A logic analyzer built around an Intel Cyclone IV FPGA and a Python/Tkinter desktop application. The FPGA captures digital transitions into on-chip memory; the desktop application reconstructs waveforms, predicts channel roles, and overlays decoded protocol data. An ESP32 sketch supplies a reproducible set of test signals.
+Dự án máy phân tích logic sử dụng FPGA Intel Cyclone IV và ứng dụng máy tính viết bằng Python/Tkinter. FPGA ghi nhận các lần chuyển mức của tín hiệu số vào bộ nhớ trên chip; ứng dụng máy tính dựng lại dạng sóng, dự đoán vai trò từng kênh và hiển thị dữ liệu giao thức đã giải mã trực tiếp trên sóng. Chương trình ESP32 đi kèm tạo bộ tín hiệu thử để kiểm tra hệ thống.
 
-![Logic analyzer GUI showing 16 channels, detected roles, and decoded data](docs/images/gui-overview.jpg)
+![Giao diện máy phân tích logic với 16 kênh, vai trò được nhận dạng và dữ liệu giải mã](docs/images/gui-overview.jpg)
 
-*GUI screenshot extracted from the project's development report. It shows one recorded development capture; channel activity and labels depend on the connected signals.*
+*Ảnh GUI được trích từ báo cáo phát triển của dự án, minh họa một phiên thu nhận thực tế trong quá trình phát triển. Hoạt động và nhãn của các kênh phụ thuộc vào tín hiệu được kết nối.*
 
-## Highlights
+## Tính năng nổi bật
 
-- **Parallel acquisition:** 16 synchronized digital inputs, with a 50 MHz reference clock multiplied to 100 MHz by a PLL.
-- **Event-based recording:** each record contains a 16-bit channel state and an 8-bit timestamp delta. Transitions and timestamp rollovers generate records.
-- **Triggered capture:** selectable channel and rising/falling edge, with configurable pre-trigger memory and post-trigger acquisition.
-- **Automatic channel identification:** heuristic detection of UART, I2C, SPI, PWM, clocks, counters, and idle channels, with confidence scores and channel-order invariance.
-- **Protocol annotations:** UART bytes, SPI MOSI/MISO data, I2C addresses and data, and START/STOP/ACK/NACK markers.
-- **Interactive inspection:** 16 waveform tracks, cursor-centered zoom, horizontal navigation, two-point time measurements, and manual role assignment through Decode Setup.
-- **Hardware-independent testing:** synthetic captures exercise decoding, shuffled channel assignments, timestamp rollovers, truncated transactions, and cross-capture role accumulation.
+- **Thu nhận song song:** 16 đầu vào số được đồng bộ; PLL nhân xung nhịp tham chiếu 50 MHz lên 100 MHz.
+- **Ghi dữ liệu theo sự kiện:** mỗi bản ghi chứa trạng thái 16 bit của các kênh và độ chênh thời gian 8 bit. Bản ghi được tạo khi tín hiệu chuyển mức hoặc bộ đếm thời gian tràn.
+- **Thu nhận có trigger:** chọn kênh và cạnh lên/cạnh xuống để kích hoạt, cấu hình vùng nhớ trước trigger và thu dữ liệu sau trigger.
+- **Tự động nhận dạng kênh:** dựa trên đặc trưng tín hiệu để nhận dạng UART, I2C, SPI, PWM, clock, bộ đếm và kênh không hoạt động; kết quả có điểm tin cậy và không phụ thuộc thứ tự kênh.
+- **Chú thích giao thức:** hiển thị byte UART, dữ liệu SPI MOSI/MISO, địa chỉ và dữ liệu I2C, cùng các dấu START/STOP/ACK/NACK.
+- **Quan sát tương tác:** 16 dải dạng sóng, phóng to tại vị trí con trỏ, di chuyển theo trục thời gian, đo khoảng cách thời gian giữa hai điểm và gán vai trò thủ công qua Decode Setup.
+- **Kiểm thử không cần phần cứng:** dữ liệu tổng hợp được dùng để kiểm tra giải mã, hoán đổi kênh, tràn timestamp, giao dịch bị cắt cụt và tích lũy kết quả nhận dạng qua nhiều lần thu.
 
-The acquisition model is **buffered capture followed by readout**. Auto Run repeats this cycle; it does not provide uninterrupted 100 MSa/s streaming over UART.
+Hệ thống **thu dữ liệu vào bộ đệm rồi mới đọc ra máy tính**. Auto Run lặp lại chu trình này; liên kết UART không truyền liên tục toàn bộ dữ liệu ở tốc độ 100 MSa/s.
 
-## Architecture
+## Kiến trúc hệ thống
 
-Signal path: **DUT / ESP32 → input protection → FPGA capture buffer → USB-UART → Python GUI**.
+Luồng tín hiệu: **DUT / ESP32 → mạch bảo vệ đầu vào → bộ đệm thu nhận trên FPGA → USB-UART → GUI Python**.
 
-![FPGA acquisition, trigger, memory, and UART architecture](docs/images/fpga-architecture.jpg)
+![Kiến trúc FPGA gồm khối thu nhận, trigger, bộ nhớ và UART](docs/images/fpga-architecture.jpg)
 
-The RTL synchronizes the probes, detects transitions, attaches timestamp deltas, and stores records in a circular buffer. After the trigger and post-capture phase, the PC requests buffer readout. The Python side reconstructs a shared time axis, classifies channel roles, and runs the decoders.
+Các khối RTL đồng bộ đầu vào, phát hiện chuyển mức, gắn độ chênh thời gian và lưu bản ghi vào bộ đệm vòng. Sau khi có trigger và hoàn tất thu dữ liệu sau trigger, máy tính yêu cầu đọc bộ đệm. Phần mềm Python dựng lại trục thời gian chung, phân loại vai trò kênh và thực hiện giải mã.
 
-## Specifications
+## Thông số kỹ thuật
 
-| Item | Configuration |
+| Hạng mục | Cấu hình |
 | --- | --- |
-| FPGA | Cyclone IV E, EP4CE6E22C8; project board uses EP4CE6E22C8N |
-| Input channels | 16, configured as 3.3 V LVTTL |
-| Reference / internal clock | 50 MHz / 100 MHz |
-| Sample rate | `100 MHz / (S + 1)`, where `S` is the scaler value |
-| Maximum sample rate | 100 MSa/s; nominal 10 ns sample interval |
-| Capture memory | 8,192 × 24-bit records, or 24 KiB |
-| Record payload | 8-bit timestamp delta + 16-bit channel state |
-| Host link | UART, 115200 baud, 8N1; RTL uses `CLKS_PER_BIT = 870` |
-| Trigger | Selected channel, rising/falling edge; optional delay in RTL |
-| Analysis | UART, I2C, SPI, PWM/clock measurements, counter recognition |
+| FPGA | Cyclone IV E, EP4CE6E22C8; bo mạch của dự án sử dụng EP4CE6E22C8N |
+| Kênh đầu vào | 16 kênh, cấu hình chuẩn 3,3 V LVTTL |
+| Xung nhịp tham chiếu / nội bộ | 50 MHz / 100 MHz |
+| Tốc độ lấy mẫu | `100 MHz / (S + 1)`, với `S` là giá trị scaler |
+| Tốc độ lấy mẫu tối đa | 100 MSa/s; chu kỳ lấy mẫu danh định 10 ns |
+| Bộ nhớ thu nhận | 8.192 bản ghi × 24 bit, tương đương 24 KiB |
+| Nội dung mỗi bản ghi | Độ chênh thời gian 8 bit + trạng thái 16 bit của các kênh |
+| Kết nối máy tính | UART, 115200 baud, 8N1; RTL sử dụng `CLKS_PER_BIT = 870` |
+| Trigger | Chọn kênh, cạnh lên/cạnh xuống; RTL hỗ trợ trễ trigger tùy chọn |
+| Phân tích | Giải mã UART, I2C, SPI; đo PWM/clock; nhận dạng bộ đếm |
 
-The GUI field labeled **Sample Rate (Divisor)** contains `S`, not `S + 1`:
+Trường **Sample Rate (Divisor)** trên GUI chứa giá trị `S`, không phải `S + 1`:
 
-| GUI value `S` | Sample rate | Time per tick |
+| Giá trị `S` trên GUI | Tốc độ lấy mẫu | Thời gian mỗi tick |
 | --- | --- | --- |
 | 0 | 100 MSa/s | 10 ns |
 | 1 | 50 MSa/s | 20 ns |
 | 9 | 10 MSa/s | 100 ns |
 | 99 | 1 MSa/s | 1 µs |
 
-## Repository Contents
+## Cấu trúc kho mã nguồn
 
-| Path | Purpose |
+| Đường dẫn | Chức năng |
 | --- | --- |
-| [`src/`](src/) | Verilog acquisition, trigger, timestamp, buffer, UART, and PLL IP files |
-| [`quartus_test/`](quartus_test/) | Quartus project, device selection, and FPGA pin assignments |
-| [`firmware/`](firmware/) | Two original prebuilt SOF images for board bring-up |
-| [`gui/main.py`](gui/main.py) | Desktop interface, serial capture, waveform rendering, and annotations |
-| [`gui/sample_access.py`](gui/sample_access.py) | Time-axis and channel access helpers |
-| [`gui/channel_predictor.py`](gui/channel_predictor.py) | Channel-role prediction and accumulation across captures |
-| [`gui/decoders.py`](gui/decoders.py) | Protocol decoding and timing measurements |
-| [`gui/test_decode_offline.py`](gui/test_decode_offline.py) | Hardware-independent regression suite |
-| [`gui/fpga_link_check.py`](gui/fpga_link_check.py) | Serial-link and input-activity diagnostics |
-| [`gui/capture_dump.py`](gui/capture_dump.py), [`gui/analyze_dump.py`](gui/analyze_dump.py) | Save hardware captures as JSON and inspect them offline |
-| [`esp32_gen_input/`](esp32_gen_input/) | Arduino ESP32 test-signal generator |
-| [`sim/top_testbench.v`](sim/top_testbench.v) | Original RTL unit/system simulation testbench |
-| [`hardware/`](hardware/) | LTspice input-protection schematics and simulation runner |
-| [`docs/images/`](docs/images/) | Selected GUI and architecture figures used in this README |
+| [`src/`](src/) | Mã Verilog cho thu nhận, trigger, timestamp, bộ đệm, UART và các tệp IP PLL |
+| [`quartus_test/`](quartus_test/) | Project Quartus, lựa chọn chip và gán chân FPGA |
+| [`firmware/`](firmware/) | Hai bitstream SOF đã biên dịch sẵn để nạp và kiểm tra bo mạch |
+| [`gui/main.py`](gui/main.py) | Giao diện máy tính, thu nhận qua serial, vẽ dạng sóng và chú thích |
+| [`gui/sample_access.py`](gui/sample_access.py) | Các hàm hỗ trợ truy cập trục thời gian và dữ liệu kênh |
+| [`gui/channel_predictor.py`](gui/channel_predictor.py) | Dự đoán vai trò kênh và tích lũy kết quả qua nhiều lần thu |
+| [`gui/decoders.py`](gui/decoders.py) | Giải mã giao thức và đo các thông số thời gian |
+| [`gui/test_decode_offline.py`](gui/test_decode_offline.py) | Bộ kiểm thử hồi quy không cần phần cứng |
+| [`gui/fpga_link_check.py`](gui/fpga_link_check.py) | Chẩn đoán liên kết serial và hoạt động tín hiệu đầu vào |
+| [`gui/capture_dump.py`](gui/capture_dump.py), [`gui/analyze_dump.py`](gui/analyze_dump.py) | Lưu dữ liệu thu từ phần cứng dưới dạng JSON và phân tích ngoại tuyến |
+| [`esp32_gen_input/`](esp32_gen_input/) | Chương trình Arduino ESP32 tạo tín hiệu thử |
+| [`sim/top_testbench.v`](sim/top_testbench.v) | Testbench gốc để mô phỏng các khối RTL và toàn hệ thống |
+| [`hardware/`](hardware/) | Sơ đồ LTspice của mạch bảo vệ đầu vào và chương trình chạy mô phỏng |
+| [`docs/images/`](docs/images/) | Ảnh GUI và sơ đồ kiến trúc dùng trong README |
 
-Reports, slides, presentation scripts, system-summary documents, generated simulation libraries, and Quartus build databases are omitted. The two named SOF images are retained deliberately as useful programming artifacts.
+Kho mã nguồn đã loại các báo cáo, slide, kịch bản thuyết trình, tài liệu tổng quan hệ thống, thư viện mô phỏng sinh tự động và cơ sở dữ liệu build Quartus. Hai tệp SOF được giữ lại để phục vụ nạp FPGA.
 
-## Quick Start: Desktop Application
+## Chạy nhanh ứng dụng máy tính
 
-Use Python **3.10 or later** with Tkinter/Tcl-Tk support. The Python regression suite was run with Python 3.12 while preparing this repository.
+Sử dụng Python **3.10 trở lên**, có hỗ trợ Tkinter/Tcl-Tk. Bộ kiểm thử hồi quy Python đã được chạy bằng Python 3.12 khi chuẩn bị kho mã nguồn.
 
-From the repository root, on Windows:
+Trên Windows, mở cửa sổ lệnh tại thư mục gốc của dự án:
 
 ```powershell
 py -m venv .venv
@@ -85,7 +85,7 @@ py -m venv .venv
 .\.venv\Scripts\python.exe gui/main.py
 ```
 
-On Linux/macOS, use the interpreter inside `.venv/bin/`:
+Trên Linux/macOS, sử dụng trình thông dịch trong `.venv/bin/`:
 
 ```bash
 python3 -m venv .venv
@@ -93,94 +93,94 @@ python3 -m venv .venv
 .venv/bin/python gui/main.py
 ```
 
-Tkinter is supplied by the Python installation or operating system, rather than pip. Verify it with `python -m tkinter` if the GUI cannot open.
+Tkinter được cung cấp qua bản cài Python hoặc hệ điều hành, không cài bằng pip. Nếu không mở được GUI, kiểm tra bằng lệnh `python -m tkinter`.
 
-### Capture Workflow
+### Quy trình thu nhận
 
-1. Program the FPGA and connect a 3.3 V USB-UART adapter: adapter TX → FPGA `i_rx`, adapter RX ← FPGA `o_tx`, with common ground.
-2. Connect the DUT's signals to the probe inputs. Load the ESP32 sketch if using the included demo signals.
-3. Start the application, select the FPGA's USB-UART port, and connect. The ESP32's debug serial port is a separate connection.
-4. Start with **trigger channel 1**, **Falling**, **pre-capture 1024**, and **scaler 1** for the supplied demo burst pattern.
-5. Enable Auto Decode and, optionally, Auto Run, then choose Start Capture.
-6. Zoom or pan through the traces and click two points to measure a time interval. Use Decode Setup to correct ambiguous channel roles or bus groupings.
+1. Nạp FPGA và kết nối bộ chuyển USB-UART mức 3,3 V: TX của bộ chuyển → `i_rx` trên FPGA, RX của bộ chuyển ← `o_tx` trên FPGA; nối chung GND.
+2. Kết nối tín hiệu từ thiết bị cần đo (DUT) vào các đầu dò. Nạp chương trình ESP32 nếu sử dụng bộ tín hiệu thử đi kèm.
+3. Mở ứng dụng, chọn đúng cổng USB-UART của FPGA và kết nối. Cổng serial gỡ lỗi của ESP32 là một kết nối riêng.
+4. Với chuỗi tín hiệu thử đi kèm, bắt đầu bằng **kênh trigger 1**, cạnh **Falling**, **pre-capture 1024** và **scaler 1**.
+5. Bật Auto Decode; bật thêm Auto Run nếu muốn lặp lại quá trình thu, rồi chọn Start Capture.
+6. Phóng to hoặc di chuyển dọc trục thời gian để quan sát; nhấp hai điểm để đo khoảng thời gian. Dùng Decode Setup để chỉnh vai trò kênh hoặc nhóm bus khi nhận dạng còn nhập nhằng.
 
-## FPGA Build and Programming
+## Biên dịch và nạp FPGA
 
-The supplied project was created with **Quartus Prime Lite 22.1**, targeting **EP4CE6E22C8**.
+Project đi kèm được tạo bằng **Quartus Prime Lite 22.1**, với chip đích **EP4CE6E22C8**.
 
-Open [`quartus_test/logic_analyzer_top.qpf`](quartus_test/logic_analyzer_top.qpf) in Quartus, check the board and pin assignments, and compile. With the Quartus command-line tools available:
+Mở [`quartus_test/logic_analyzer_top.qpf`](quartus_test/logic_analyzer_top.qpf) trong Quartus, kiểm tra bo mạch và gán chân, sau đó biên dịch. Nếu đã cấu hình công cụ dòng lệnh của Quartus, có thể chạy:
 
 ```bash
 cd quartus_test
 quartus_sh --flow compile logic_analyzer_top
 ```
 
-Program the resulting SOF file using Quartus Programmer and the board's programming adapter. The original images are also included:
+Dùng Quartus Programmer và bộ nạp phù hợp với bo mạch để nạp tệp SOF được tạo ra. Dự án cũng giữ lại hai bitstream gốc:
 
-| Image | Intended wiring, as documented in the original project |
+| Bitstream | Cách kết nối theo cấu hình dự án gốc |
 | --- | --- |
-| [`firmware/la_khong_dao.sof`](firmware/la_khong_dao.sof) | Direct 3.3 V probes; `INVERT_PROBE = 0` |
-| [`firmware/la_co_dao.sof`](firmware/la_co_dao.sof) | Probes through the 74LVC14A inverting protection stage; `INVERT_PROBE = 1` |
+| [`firmware/la_khong_dao.sof`](firmware/la_khong_dao.sof) | Đầu dò 3,3 V kết nối trực tiếp; `INVERT_PROBE = 0` |
+| [`firmware/la_co_dao.sof`](firmware/la_co_dao.sof) | Tín hiệu đi qua tầng bảo vệ đảo mức dùng 74LVC14A; `INVERT_PROBE = 1` |
 
-The source defaults to `INVERT_PROBE = 0`. Set this top-level parameter to match the input stage when rebuilding. The supplied images are original build artifacts; rebuild after changing RTL, device settings, or board wiring.
+Mã nguồn mặc định đặt `INVERT_PROBE = 0`. Khi biên dịch lại, đặt tham số ở module cấp cao nhất này phù hợp với tầng đầu vào. Các bitstream đi kèm là kết quả build gốc; cần biên dịch lại sau khi thay đổi RTL, cấu hình chip hoặc cách đấu nối bo mạch.
 
-### Board Connections and Demo Signals
+### Kết nối bo mạch và tín hiệu thử
 
-The `.qsf` file is the authoritative source for this board's FPGA pin mapping:
+Tệp `.qsf` là nguồn tham chiếu chính xác cho cách gán chân FPGA của bo mạch này:
 
-| Signal | FPGA pin |
+| Tín hiệu | Chân FPGA |
 | --- | --- |
-| 50 MHz clock, `i_clk` | PIN_24 |
-| Active-low reset, `i_rstn` | PIN_88 |
-| UART receive, `i_rx` | PIN_110 |
-| UART transmit, `o_tx` | PIN_111 |
+| Xung nhịp 50 MHz, `i_clk` | PIN_24 |
+| Reset tích cực mức thấp, `i_rstn` | PIN_88 |
+| UART nhận, `i_rx` | PIN_110 |
+| UART phát, `o_tx` | PIN_111 |
 
-The ESP32 sketch uses the Arduino ESP32 **3.x LEDC API** and defines the following demo wiring:
+Chương trình ESP32 sử dụng **API LEDC của Arduino ESP32 3.x**, với cấu hình tín hiệu thử sau:
 
-| Channel | FPGA probe pin | ESP32 GPIO | Demo role |
+| Kênh | Chân đầu dò FPGA | GPIO ESP32 | Tín hiệu thử |
 | --- | --- | --- | --- |
-| CH-1 | PIN_144 | 17 | UART-A TX, known byte pattern |
-| CH-2 | PIN_143 | 21 | UART-A device response, `Hi!` |
+| CH-1 | PIN_144 | 17 | UART-A TX, chuỗi byte đã biết |
+| CH-2 | PIN_143 | 21 | Phản hồi từ thiết bị UART-A, `Hi!` |
 | CH-3 | PIN_141 | 22 | I2C-A SDA |
 | CH-4 | PIN_138 | 5 | I2C-A SCL |
 | CH-5 | PIN_137 | 18 | SPI SCK |
 | CH-6 | PIN_135 | 23 | SPI MOSI |
 | CH-7 | PIN_133 | 16 | SPI MISO |
 | CH-8 | PIN_132 | 19 | SPI CS |
-| CH-9 | PIN_129 | 2 | Bit-banged UART-B |
-| CH-10 | PIN_128 | 4 | I2C-B SDA, address `0x50` / NACK case |
+| CH-9 | PIN_129 | 2 | UART-B tạo bằng phần mềm |
+| CH-10 | PIN_128 | 4 | I2C-B SDA, địa chỉ `0x50` / trường hợp NACK |
 | CH-11 | PIN_127 | 12 | I2C-B SCL |
-| CH-12 | PIN_126 | 13 | PWM, 1 kHz / approximately 75% |
-| CH-13 | PIN_125 | 14 | PWM, 10 kHz / approximately 25% |
-| CH-14 | PIN_124 | 15 | Clock, 1 MHz |
-| CH-15 | PIN_121 | 25 | Clock, 500 kHz |
-| CH-16 | PIN_120 | 26 | Clock, 100 kHz |
+| CH-12 | PIN_126 | 13 | PWM, 1 kHz / duty xấp xỉ 75% |
+| CH-13 | PIN_125 | 14 | PWM, 10 kHz / duty xấp xỉ 25% |
+| CH-14 | PIN_124 | 15 | Xung clock, 1 MHz |
+| CH-15 | PIN_121 | 25 | Xung clock, 500 kHz |
+| CH-16 | PIN_120 | 26 | Xung clock, 100 kHz |
 
-Follow the sketch's self-slave connections for the I2C and SPI demo responses. Use 3.3 V logic at the FPGA pins; voltage tolerance provided by an external protection stage must not be assumed for bare FPGA inputs. The LTspice schematics model the optional protection circuit, whose inversion is compensated by `INVERT_PROBE`.
+Đấu các kết nối tự mô phỏng thiết bị slave theo hướng dẫn trong chương trình ESP32 để tạo phản hồi I2C và SPI. Các chân FPGA sử dụng tín hiệu logic 3,3 V; không áp dụng khả năng chịu điện áp của tầng bảo vệ bên ngoài cho đầu vào FPGA kết nối trực tiếp. Sơ đồ LTspice mô hình hóa mạch bảo vệ tùy chọn; chức năng đảo mức của mạch được bù bằng `INVERT_PROBE`.
 
-## Tests and Diagnostics
+## Kiểm thử và chẩn đoán
 
-### Offline Decoder Regression
+### Kiểm thử hồi quy bộ giải mã ngoại tuyến
 
-Run from the repository root; no FPGA or serial device is required:
+Chạy tại thư mục gốc của dự án; không cần FPGA hay thiết bị serial:
 
 ```bash
 python gui/test_decode_offline.py
 ```
 
-The supplied suite passed during repository preparation:
+Bộ kiểm thử đi kèm đã chạy thành công khi chuẩn bị kho mã nguồn:
 
-- **144/144 role assignments** across the baseline and eight shuffled channel layouts.
-- Correct identification with injected timestamp rollovers.
-- I2C repeated START, clock stretching, and NACK-only transactions.
-- UART parity/stop-bit checks and measured-baud decoding.
-- SPI MOSI/MISO recognition, truncated captures, false-positive rejection, and cross-capture role merging.
+- **144/144 lượt gán vai trò kênh** trên cấu hình cơ sở và tám cấu hình hoán đổi thứ tự kênh.
+- Nhận dạng đúng khi chèn các bản ghi mô phỏng tràn timestamp.
+- Xử lý I2C repeated START, clock stretching và giao dịch chỉ có NACK.
+- Kiểm tra bit chẵn lẻ/bit dừng UART và giải mã theo baud đo được.
+- Nhận dạng SPI MOSI/MISO, xử lý phiên thu bị cắt cụt, loại nhận dạng nhầm và gộp kết quả nhận dạng qua nhiều lần thu.
 
-The existing RTL testbench is retained for Questa/ModelSim. It needs Intel's PLL simulation library (`altera_mf_ver`) when using `pll_sys.v`; do not compile `pll_sys_bb.v` as a second implementation of the same module. RTL simulation, Quartus compilation, LTspice simulations, and physical hardware were not rerun during repository preparation.
+Testbench RTL gốc được giữ lại để dùng với Questa/ModelSim. Khi sử dụng `pll_sys.v`, cần thư viện mô phỏng PLL của Intel (`altera_mf_ver`); không biên dịch thêm `pll_sys_bb.v` như một bản triển khai thứ hai của cùng module. Mô phỏng RTL, biên dịch Quartus, mô phỏng LTspice và kiểm tra trên phần cứng thật chưa được chạy lại trong quá trình chuẩn bị kho mã nguồn.
 
-### Link Check and Capture Dumps
+### Kiểm tra liên kết và lưu dữ liệu thu nhận
 
-Replace `COM5` with the connected FPGA adapter, or use a port such as `/dev/ttyUSB0`:
+Thay `COM5` bằng cổng của bộ chuyển kết nối với FPGA; trên Linux có thể dùng cổng như `/dev/ttyUSB0`:
 
 ```bash
 python gui/fpga_link_check.py COM5 --trig 16
@@ -188,42 +188,29 @@ python gui/capture_dump.py --port COM5 --trig 1 --edge fall --scaler 1 --precap 
 python gui/analyze_dump.py gui/dumps/capture.json
 ```
 
-Use the `.qsf` pin mapping above when wiring hardware; some original diagnostic messages still refer to an earlier pin layout.
+Khi đấu nối phần cứng, sử dụng bảng gán chân trong tệp `.qsf` nêu trên; một số thông báo chẩn đoán gốc vẫn nhắc tới sơ đồ chân của phiên bản trước.
 
-The optional protection-circuit runner is `hardware/sim/run_all.py`. It currently expects LTspice installed through Wine; its `LTSPICE` path must match the local installation. Generated plots, raw simulation data, and results remain ignored.
+Chương trình chạy mô phỏng mạch bảo vệ là `hardware/sim/run_all.py`. Hiện chương trình yêu cầu LTspice cài qua Wine; cần đặt đường dẫn `LTSPICE` trong chương trình phù hợp với máy đang sử dụng. Các biểu đồ, dữ liệu thô và kết quả mô phỏng sinh ra được loại khỏi Git.
 
-## Data Format
+## Định dạng dữ liệu
 
-Each captured record is sent as four bytes: **`[header, delta_ticks, channels_low, channels_high]`**. Channel 1 is bit 0 of the reconstructed 16-bit channel word.
+Mỗi bản ghi thu nhận được gửi thành bốn byte: **`[header, delta_ticks, channels_low, channels_high]`**. Kênh 1 tương ứng bit 0 của từ dữ liệu 16 bit được dựng lại.
 
-| Header | Meaning |
+| Header | Ý nghĩa |
 | --- | --- |
-| `0xA1` | Pre-trigger record |
-| `0xA3` | Post-trigger record |
-| `0xA7` | Trigger notification |
-| `0xAF` | Buffer-full notification |
+| `0xA1` | Bản ghi trước trigger |
+| `0xA3` | Bản ghi sau trigger |
+| `0xA7` | Thông báo đã có trigger |
+| `0xAF` | Thông báo bộ đệm đã đầy |
 
-`0xA7` and `0xAF` are capture-phase notifications, separate from the four-byte data records. The PC sends two-byte `[command, value]` messages. Scaler (`0xFA`) and pre-capture depth (`0xFE`) each require two such messages, high byte first and then low byte. Other commands select the trigger channel (`0xFB`), edge (`0xFC`), enable (`0xFD`), readout (`0xF9`), stop (`0xFF`), and optional trigger delay (`0xF7` / `0xF8`).
+`0xA7` và `0xAF` là các thông báo trong giai đoạn thu nhận, tách biệt với bản ghi dữ liệu bốn byte. Máy tính gửi lệnh hai byte dạng `[command, value]`. Để đặt scaler (`0xFA`) hoặc độ sâu vùng nhớ trước trigger (`0xFE`), mỗi tham số cần hai lệnh cùng loại: gửi byte cao trước, byte thấp sau. Các lệnh còn lại dùng để chọn kênh trigger (`0xFB`), cạnh trigger (`0xFC`), bật thu nhận (`0xFD`), yêu cầu đọc bộ đệm (`0xF9`), dừng (`0xFF`) và cấu hình trễ trigger tùy chọn (`0xF7` / `0xF8`).
 
-Time is reconstructed using `elapsed_ns = cumulative_ticks × (S + 1) × 10`.
+Thời gian được dựng lại theo công thức `elapsed_ns = cumulative_ticks × (S + 1) × 10`.
 
-## Performance and Limits
+## Hiệu năng và giới hạn
 
-- A full buffer contains 32,768 UART data bytes. At 115200 baud / 8N1, the theoretical readout time is approximately **2.84 seconds**, before software overhead.
-- Capture duration depends on transition density and the records inserted when the 8-bit timestamp rolls over.
-- Auto Run joins capture blocks for display. The dead time between blocks is not a continuously measured waveform interval.
-- Fast clocks and slow transactions may need separate captures with different scaler values. Ambiguous patterns can require manual channel assignments.
-- The original Quartus build reports an internal-clock Fmax of **131.13 MHz**, **514 / 6,272 logic elements**, and **196,608 / 276,480 memory bits**. These are historical build results; the original timing report also lists unconstrained external I/O paths. Review timing constraints when adapting the design to another board.
-
-## Team and Provenance
-
-Developed for the Embedded Systems and Embedded Interface Design course at Hanoi University of Science and Technology.
-
-| Team member | Primary contribution |
-| --- | --- |
-| Nguyễn Quốc Huy | PC channel-role prediction and protocol decoders |
-| Trần Độ | Desktop GUI, serial interface, and waveform display |
-| Tạ Văn Việt | Project coordination, FPGA, PCB, and UART integration |
-| Trần Phi Anh Nhật | ESP32 test signals, component selection, and protection schematic |
-
-The GUI and FPGA architecture images were extracted from Figures 9 and 6 of the team's original report. The full report is intentionally omitted from this repository. Existing Intel notices in the generated PLL IP and Quartus files are retained; no additional repository-wide license is assigned here.
+- Một bộ đệm đầy chứa 32.768 byte dữ liệu UART. Với 115200 baud / 8N1, thời gian đọc ra lý thuyết khoảng **2,84 giây**, chưa tính thời gian xử lý của phần mềm.
+- Khoảng thời gian quan sát được trong một lần thu phụ thuộc vào mật độ chuyển mức và số bản ghi được chèn khi bộ đếm thời gian 8 bit tràn.
+- Auto Run nối các khối thu nhận để hiển thị. Khoảng thời gian chết giữa các khối không được đo như một đoạn dạng sóng liên tục.
+- Xung clock nhanh và giao dịch chậm có thể cần các lần thu riêng với giá trị scaler khác nhau. Những dạng tín hiệu nhập nhằng có thể cần gán vai trò kênh thủ công.
+- Kết quả build Quartus gốc ghi nhận Fmax của xung nhịp nội bộ là **131,13 MHz**, sử dụng **514 / 6.272 phần tử logic** và **196.608 / 276.480 bit bộ nhớ**. Đây là số liệu của lần build trước; báo cáo timing gốc còn liệt kê các đường I/O bên ngoài chưa được ràng buộc. Cần rà soát ràng buộc thời gian khi chuyển thiết kế sang bo mạch khác.
