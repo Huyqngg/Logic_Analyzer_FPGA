@@ -1,0 +1,71 @@
+# Python environments and generated data
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+gui/dumps/
+
+# Quartus build databases and generated output
+db/
+incremental_db/
+output_files/
+greybox_tmp/
+*.qws
+*.rpt
+*.summary
+*.smsg
+*.qmsg
+*.jdi
+*.sof
+!firmware/*.sof
+*.pof
+*.rbf
+*.jic
+*.done
+quartus_test/simulation/
+
+# ModelSim/Questa libraries and waveforms
+work/
+vsim/
+transcript
+*.wlf
+*.vcd
+*.qdb
+*.qpg
+*.qtl
+*.mpf
+*.mti
+
+# LTspice generated results
+hardware/sim/out/
+*.raw
+*.log
+*.net
+*.op.raw
+
+# Reports, slides, and presentation material
+slides/
+reports/
+*.pdf
+*.ppt
+*.pptx
+*.doc
+*.docx
+TONG_QUAN_*
+PHAN_CHIA_*
+KICH_BAN_*
+hardware/BAO_VE_IO.md
+hardware/sim/make_report.py
+
+# Local credentials, editor settings, and OS metadata
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*
